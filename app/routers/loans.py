@@ -24,8 +24,6 @@ logger = logging.getLogger(__name__)
 @router.get("/me", response_model=list[LoanReadBook])
 async def get_loans(member: CurrentMember, db: DBsession):
     loans = (await db.scalars(select(Loan).where(Loan.member == member).options(selectinload(Loan.book)))).all()
-    if not loans:
-        raise HTTPException(status_code=404, detail="Not Found")
     return loans
 
 
@@ -53,6 +51,4 @@ async def return_book(loan_id: int, member: CurrentMember, db: DBsession):
 async def get_overdue_loans(db: DBsession):
     stmt = select(Loan).where(Loan.returned_at == None, Loan.due_date < date.today(timezone.utc)).options(selectinload(Loan.book), selectinload(Loan.member))
     loans = (await db.scalars(stmt)).all()
-    if not loans:
-        raise HTTPException(status_code=404, detail="Not Found")
     return loans

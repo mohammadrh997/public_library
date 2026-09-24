@@ -39,8 +39,6 @@ async def get_books(db: DBsession, pagation: PaginationDep, search: None | str =
         stmt = stmt.where(Book.author == search)
     stmt = stmt.offset(pagation.get("skip")).limit(pagation.get("limit"))
     books = (await db.scalars(stmt)).all()
-    if not books:
-        raise HTTPException(status_code=404, detail="Not Found")
     return books
 
 @router.get("/{book_id}", response_model= BookRead)
