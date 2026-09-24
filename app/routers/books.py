@@ -2,7 +2,7 @@ from typing import Annotated
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, status, HTTPException, Depends
+from fastapi import APIRouter, status, HTTPException, Depends, BackgroundTasks
 from fastapi.concurrency import run_in_threadpool
 
 from sqlalchemy import select, and_, func
@@ -26,6 +26,10 @@ async def fetch_book(book_id: int, db: AsyncSession) -> Book:
     if not book:
         raise ResourceNotFound("book", book_id)
     return book
+
+def append_log(book: Book):
+    with open("lending_log.txt", "a") as file:
+        file.write(f"Book number {book.id} was sccuessfully borrow at {datetime.now(timezone.utc)}\n")
 
 
 @router.get("", response_model=list[BookRead])
@@ -87,7 +91,7 @@ async def delete_book(book_id: int, db: DBsession):
 
 
 @router.post("/{book_id}/borrow", response_model=LoanRead)
-async def borrow_book(book_id: int, member: CurrentMember, db: DBsession):
+async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgrounder: BackgroundTasks):
     book = await fetch_book(book_id, db)
     # if every copy is already on loan
     stmt = select(func.count(Loan.id)).where(and_(Loan.book == book, Loan.returned_at == None))
@@ -118,5 +122,6 @@ async def borrow_book(book_id: int, member: CurrentMember, db: DBsession):
                 status_code=406,
                 detail="Couldn't proccess borrow",
             )
+    backgrounder.add_task(append_log, book)
     await db.refresh(loan)
     return loan
