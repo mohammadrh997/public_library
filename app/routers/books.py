@@ -85,8 +85,15 @@ async def patch_book(book_id: int, payload: BookUpdate, db: DBsession):
 @router.delete("/{book_id}", dependencies=[(Depends(require_librarian))], status_code=status.HTTP_204_NO_CONTENT)
 async def delete_book(book_id: int, db: DBsession):
     book = await fetch_book(book_id, db)
-    await db.delete(book)
-    await db.commit()
+    try:
+        await db.delete(book)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete this book because it has loan records.",
+        )
 
 
 

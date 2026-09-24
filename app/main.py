@@ -28,3 +28,4 @@ app.include_router(books.router)
 app.include_router(loans.router)
 
 app.add_exception_handler(ResourceNotFound, resource_not_found_handler)
+app.add_exception_handler(Exception, exp_haneler)
