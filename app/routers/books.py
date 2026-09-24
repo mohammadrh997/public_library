@@ -98,14 +98,6 @@ async def delete_book(book_id: int, db: DBsession):
 @router.post("/{book_id}/borrow", response_model=LoanRead)
 async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgrounder: BackgroundTasks):
     book = await fetch_book(book_id, db)
-    # if every copy is already on loan
-    stmt = select(func.count(Loan.id)).where(and_(Loan.book == book, Loan.returned_at == None))
-    active_loans = await db.scalar(stmt)
-    if book.total_copies <= active_loans:
-        raise HTTPException(
-                    status_code=422,
-                    detail="The book have no avaliable copies",
-                )
     
     # if this member already has an unreturned loan of this book
     stmt = select(Loan).where(Loan.book == book, Loan.member == member, Loan.returned_at == None)
@@ -115,6 +107,14 @@ async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgr
                 status_code=422,
                 detail="You already have copy of this book",
             )
+    # if every copy is already on loan
+    stmt = select(func.count(Loan.id)).where(and_(Loan.book == book, Loan.returned_at == None))
+    active_loans = await db.scalar(stmt)
+    if book.total_copies <= active_loans:
+        raise HTTPException(
+                    status_code=422,
+                    detail="The book have no avaliable copies",
+                )
     due_date = datetime.now(timezone.utc) + timedelta(days= 14)
     loan = Loan(book=book, member=member, due_date=due_date)
     db.add(loan)
