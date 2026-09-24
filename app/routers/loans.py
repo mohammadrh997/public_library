@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.models import Book, Loan
-from app.schemas import(LoanReadBook, LoanRead)
+from app.schemas import(LoanReadBook,LoanReadBookMember ,LoanRead)
 from app.dependencies import DBsession, CurrentMember, require_librarian, pagination_params
 
 
@@ -48,3 +48,11 @@ async def return_book(loan_id: int, member: CurrentMember, db: DBsession):
         )
     await db.refresh(loan)
     return loan
+
+@router.get("/overdue", response_model= list[LoanReadBookMember], dependencies=[Depends(require_librarian)])
+async def get_overdue_loans(db: DBsession):
+    stmt = select(Loan).where(Loan.returned_at == None, Loan.due_date < datetime.now(timezone.utc)).options(selectinload(Loan.book), selectinload(Loan.member))
+    loans = (await db.scalars(stmt)).all()
+    if not loans:
+        raise HTTPException(status_code=404, detail="Not Found")
+    return loans

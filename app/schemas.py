@@ -88,3 +88,8 @@ class LoanReadBook(LoanRead):
     model_config = {"from_attributes": True}
 
     book: "BookRead"
+
+class LoanReadBookMember(LoanReadBook):
+    model_config = {"from_attributes": True}
+
+    member: "MemberRead"
