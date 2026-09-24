@@ -2,7 +2,7 @@ from typing import Annotated
 from collections.abc import AsyncGenerator
 
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,5 +48,8 @@ async def require_librarian(member: CurrentMember):
         raise HTTPException(status_code=403, detail="Admin access required")
 
 
-def pagination_params(skip: int = 0, limit: int = 10):
+def pagination_params(
+        skip: int = Query(0, ge=0),
+        limit: int = Query(10, ge=1, le=100)
+        ):
     return {"skip": skip, "limit": limit}
