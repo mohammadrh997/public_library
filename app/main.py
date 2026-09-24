@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.database import engine
 
@@ -29,3 +30,12 @@ app.include_router(loans.router)
 
 app.add_exception_handler(ResourceNotFound, resource_not_found_handler)
 app.add_exception_handler(Exception, exp_haneler)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins= ["https://myfrontend.com"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
