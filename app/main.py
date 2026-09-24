@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from app.database import engine
 
 
-from app.routers import auth
+from app.routers import auth, books
 
 
 @asynccontextmanager
@@ -20,3 +20,4 @@ app = FastAPI(title="Library", lifespan=lifespan)
 
 
 app.include_router(auth.router)
+app.include_router(books.router)

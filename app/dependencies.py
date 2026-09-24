@@ -46,3 +46,7 @@ CurrentMember = Annotated[Member, Depends(get_current_member)]
 async def require_librarian(member: CurrentMember):
     if not member.is_librarian:
         raise HTTPException(status_code=403, detail="Admin access required")
+
+
+def pagination_params(skip: int = 0, limit: int = 10):
+    return {"skip": skip, "limit": limit}
