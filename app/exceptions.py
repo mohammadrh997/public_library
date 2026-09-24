@@ -14,7 +14,7 @@ class ResourceNotFound(Exception):
 async def resource_not_found_handler(request: Request, exc: ResourceNotFound):
     return JSONResponse(
         status_code=404,
-        content={"detail": f"{exc.resource} {exc.product_id} not Found"}
+        content={"detail": f"{exc.resource}, {exc.resource_id} Was not Found"}
     )
 
 async def exp_haneler(request: Request, exc: Exception):
