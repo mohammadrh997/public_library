@@ -34,6 +34,8 @@ async def return_book(loan_id: int, member: CurrentMember, db: DBsession):
         raise HTTPException(status_code=404, detail="Not Found")
     if loan.member != member:
         raise HTTPException(status_code=403, detail="Unuthrized changes")
+    if loan.returned_at:
+        raise HTTPException(status_code=409, detail="This book has already been returned")
     loan.returned_at = datetime.now(timezone.utc)
     try:
         await db.commit()
