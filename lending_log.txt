@@ -1,2 +1,0 @@
-Book number 2 was sccuessfully borrow at 2026-09-24 17:55:02.813721+00:00
-Book number 3 was sccuessfully borrow at 2026-09-24 17:55:11.902622+00:00
