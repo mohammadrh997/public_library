@@ -29,7 +29,7 @@ async def fetch_book(book_id: int, db: AsyncSession) -> Book:
 
 def append_log(book: Book):
     with open("lending_log.txt", "a") as file:
-        file.write(f"Book number {book.id} was sccuessfully borrow at {datetime.now(timezone.utc)}\n")
+        file.write(f"Book number {book.id} was successfully borrowed at {datetime.now(timezone.utc)}\n")
 
 
 @router.get("", response_model=list[BookRead])
@@ -105,7 +105,7 @@ async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgr
     if loans:
         raise HTTPException(
                 status_code=422,
-                detail="You already have copy of this book",
+                detail="You already have a copy of this book",
             )
     # if every copy is already on loan
     stmt = select(func.count(Loan.id)).where(and_(Loan.book == book, Loan.returned_at == None))
@@ -113,7 +113,7 @@ async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgr
     if book.total_copies <= active_loans:
         raise HTTPException(
                     status_code=422,
-                    detail="The book have no avaliable copies",
+                    detail="The book has no available copies",
                 )
     due_date = datetime.now(timezone.utc) + timedelta(days= 14)
     loan = Loan(book=book, member=member, due_date=due_date)
@@ -123,7 +123,7 @@ async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgr
     except IntegrityError as e:
         await db.rollback()
         logger.error(e)
-        raise Exception
+        raise
     backgrounder.add_task(append_log, book)
     await db.refresh(loan)
     return loan
