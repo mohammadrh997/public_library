@@ -1,15 +1,16 @@
 from typing import Annotated
 import logging
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, status, HTTPException, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from sqlalchemy import select
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.models import Book, Loan
-from app.schemas import(BookRead, BookCreate, BookUpdate)
+from app.schemas import(BookRead, BookCreate, BookUpdate, LoanRead)
 from app.dependencies import DBsession, CurrentMember, require_librarian, pagination_params
 
 
@@ -19,7 +20,7 @@ PaginationDep = Annotated[dict, Depends(pagination_params)]
 logger = logging.getLogger(__name__)
 
 
-async def fetch_book(book_id: int, db: AsyncSession):
+async def fetch_book(book_id: int, db: AsyncSession) -> Book:
     book = await db.get(Book, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Not Found")
@@ -81,3 +82,40 @@ async def delete_book(book_id: int, db: DBsession):
     book = await fetch_book(book_id, db)
     await db.delete(book)
     await db.commit()
+
+
+
+@router.post("/{book_id}/borrow", response_model=LoanRead)
+async def borrow_book(book_id: int, member: CurrentMember, db: DBsession):
+    book = await fetch_book(book_id, db)
+    # if every copy is already on loan
+    stmt = select(func.count(Loan.id)).where(and_(Loan.book == book, Loan.returned_at == None))
+    active_loans = await db.scalar(stmt)
+    if book.total_copies <= active_loans:
+        raise HTTPException(
+                    status_code=422,
+                    detail="The book have no avaliable copies",
+                )
+    
+    # if this member already has an unreturned loan of this book
+    stmt = select(Loan).where(Loan.book == book, Loan.member == member, Loan.returned_at == None)
+    loans = (await db.scalars(stmt)).all()
+    if loans:
+        raise HTTPException(
+                status_code=422,
+                detail="You already have copy of this book",
+            )
+    due_date = datetime.now(timezone.utc) + timedelta(days= 14)
+    loan = Loan(book=book, member=member, due_date=due_date)
+    db.add(loan)
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        logger.error(e)
+        raise HTTPException(
+                status_code=406,
+                detail="Couldn't proccess boroow",
+            )
+    await db.refresh(loan)
+    return loan
