@@ -9,13 +9,13 @@ class MemberBase(BaseModel):
 
 
 class MemberCreate(MemberBase):
-    password: str = Field(min_length=8, max_length=20)
+    password: str = Field(min_length=8, max_length=40)
 
 
 class MemberUpdate(BaseModel):
     email: Optional[EmailStr] = Field(default= None)
     name: Optional[str] = Field(default= None, min_length=1, max_length=20)
-    password: Optional[str] = Field(default= None, min_length=8, max_length=20)
+    password: Optional[str] = Field(default= None, min_length=8, max_length=40)
 
 
 class MemberRead(BaseModel):
@@ -32,8 +32,8 @@ class MemberRead(BaseModel):
 
 
 class BookBase(BaseModel):
-    title: str = Field(min_length=1, max_length=40)
-    author: str = Field(min_length=1, max_length=30)
+    title: str = Field(min_length=1, max_length=50)
+    author: str = Field(min_length=1, max_length=50)
     isbn: str = Field(min_length=10, max_length=20)
     total_copies: int = Field(ge=0)
 
@@ -43,8 +43,8 @@ class BookCreate(BookBase):
 
 
 class BookUpdate(BaseModel):
-    title: Optional[str] = Field(min_length=1, max_length=40, default=None)
-    author: Optional[str] = Field(min_length=1, max_length=30, default=None)
+    title: Optional[str] = Field(min_length=1, max_length=50, default=None)
+    author: Optional[str] = Field(min_length=1, max_length=50, default=None)
     isbn: Optional[str] = Field(min_length=10, max_length=20, default=None)
     total_copies: Optional[int] = Field(ge=0, default=None)
 
