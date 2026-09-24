@@ -1,6 +1,6 @@
 from typing import Annotated
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 from fastapi import APIRouter, status, HTTPException, Depends
 from fastapi.concurrency import run_in_threadpool
@@ -51,7 +51,7 @@ async def return_book(loan_id: int, member: CurrentMember, db: DBsession):
 
 @router.get("/overdue", response_model= list[LoanReadBookMember], dependencies=[Depends(require_librarian)])
 async def get_overdue_loans(db: DBsession):
-    stmt = select(Loan).where(Loan.returned_at == None, Loan.due_date < datetime.now(timezone.utc)).options(selectinload(Loan.book), selectinload(Loan.member))
+    stmt = select(Loan).where(Loan.returned_at == None, Loan.due_date < date.today(timezone.utc)).options(selectinload(Loan.book), selectinload(Loan.member))
     loans = (await db.scalars(stmt)).all()
     if not loans:
         raise HTTPException(status_code=404, detail="Not Found")
