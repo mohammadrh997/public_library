@@ -115,7 +115,7 @@ async def borrow_book(book_id: int, member: CurrentMember, db: DBsession):
         logger.error(e)
         raise HTTPException(
                 status_code=406,
-                detail="Couldn't proccess boroow",
+                detail="Couldn't proccess borrow",
             )
     await db.refresh(loan)
     return loan
