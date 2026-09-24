@@ -44,3 +44,8 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: 
             headers={"WWW-Authenticate": "Bearer"},
         )
     return {"access_token": create_access_token(str(member.id)), "token_type": "bearer"} 
+
+
+@router.get("/me", response_model=MemberRead)
+async def read_me(member: CurrentMember):
+    return member
