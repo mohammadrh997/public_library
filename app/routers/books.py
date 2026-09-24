@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.models import Book, Loan
+from app.exceptions import ResourceNotFound
 from app.schemas import(BookRead, BookCreate, BookUpdate, LoanRead)
 from app.dependencies import DBsession, CurrentMember, require_librarian, pagination_params
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 async def fetch_book(book_id: int, db: AsyncSession) -> Book:
     book = await db.get(Book, book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="Not Found")
+        raise ResourceNotFound("book", book_id)
     return book
 
 

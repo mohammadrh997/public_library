@@ -4,6 +4,7 @@ from app.database import engine
 
 import logging
 from app.routers import auth, books, loans
+from app.exceptions import ResourceNotFound, resource_not_found_handler, exp_haneler
 
 
 @asynccontextmanager
@@ -25,3 +26,5 @@ app = FastAPI(title="Library", lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(books.router)
 app.include_router(loans.router)
+
+app.add_exception_handler(ResourceNotFound, resource_not_found_handler)
