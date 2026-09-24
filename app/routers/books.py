@@ -123,10 +123,7 @@ async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgr
     except IntegrityError as e:
         await db.rollback()
         logger.error(e)
-        raise HTTPException(
-                status_code=406,
-                detail="Couldn't proccess borrow",
-            )
+        raise Exception
     backgrounder.add_task(append_log, book)
     await db.refresh(loan)
     return loan
