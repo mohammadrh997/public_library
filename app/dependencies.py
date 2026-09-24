@@ -42,3 +42,7 @@ async def get_current_member(token: Annotated[str, Depends(oauth2_scheme)], db: 
 
 
 CurrentMember = Annotated[Member, Depends(get_current_member)]
+
+async def require_librarian(member: CurrentMember):
+    if not member.is_librarian:
+        raise HTTPException(status_code=403, detail="Admin access required")
