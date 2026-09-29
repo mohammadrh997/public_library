@@ -95,7 +95,7 @@ async def delete_book(book_id: int, db: DBsession):
 
 
 
-@router.post("/{book_id}/borrow", response_model=LoanRead)
+@router.post("/{book_id}/borrow", response_model=LoanRead, status_code=status.HTTP_201_CREATED)
 async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgrounder: BackgroundTasks):
     book = await fetch_book(book_id, db)
     
@@ -104,7 +104,7 @@ async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgr
     loans = (await db.scalars(stmt)).all()
     if loans:
         raise HTTPException(
-                status_code=422,
+                status_code=409,
                 detail="You already have a copy of this book",
             )
     # if every copy is already on loan
@@ -112,7 +112,7 @@ async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgr
     active_loans = await db.scalar(stmt)
     if book.total_copies <= active_loans:
         raise HTTPException(
-                    status_code=422,
+                    status_code=409,
                     detail="The book has no available copies",
                 )
     due_date = datetime.now(timezone.utc) + timedelta(days= 14)
