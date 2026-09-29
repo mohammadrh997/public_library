@@ -24,6 +24,7 @@ A REST API for a public library's lending system. Librarians manage the catalogu
 | Validation | Pydantic v2 |
 | Authentication | JWT via PyJWT, passwords hashed with Argon2 via `pwdlib` |
 | Configuration | `pydantic-settings` reading from `.env` |
+| Testing | pytest, pytest-asyncio, httpx2 |
 
 ## Project structure
 
@@ -100,6 +101,7 @@ cp .env.example .env
 | `SECRET_KEY` | yes | Signs the JWT tokens. Keep it secret. |
 | `ALGORITHM` | no | JWT signing algorithm, default `HS256` |
 | `ACCESS_TOKEN_EXP_MINUTES` | no | Token lifetime in minutes, default `30` |
+| `TEST_DATABASE_URL` | for tests | Like `DATABASE_URL`, but for a separate database whose name contains `test` |
 
 Generate a strong secret key with:
 
@@ -131,6 +133,20 @@ Registration always creates an ordinary member, so that nobody can grant themsel
 UPDATE members SET is_librarian = true WHERE email = 'librarian@example.com';
 ```
 
+### 7. Run the tests
+
+Create a separate test database owned by the same user:
+
+```sql
+CREATE DATABASE library_test OWNER library_app;
+```
+
+Its name must contain `test`, or the suite refuses to run, because the tests delete every row after each test. Set `TEST_DATABASE_URL` in `.env`, then run:
+
+```bash
+pytest -q
+```
+
 ## API reference
 
 | Method | Path | Access | Description |
@@ -157,8 +173,8 @@ Protected endpoints expect the token in an `Authorization: Bearer <token>` heade
 | 401 | Missing, invalid, or expired token, or wrong login credentials |
 | 403 | Authenticated but not permitted, such as a member acting as a librarian, or returning someone else's loan |
 | 404 | The requested book or loan does not exist |
-| 409 | Conflicts with current state: duplicate email or ISBN, returning a loan twice, deleting a book with loan history |
-| 422 | Invalid input, or a borrowing rule was broken |
+| 409 | Conflicts with current state: duplicate email or ISBN, borrowing a book with no free copies or one you already have, returning a loan twice, deleting a book with loan history |
+| 422 | Invalid input |
 | 500 | Unexpected server error. Details are logged server-side and never returned to the client |
 
 ## Example
@@ -198,5 +214,4 @@ curl -X POST http://127.0.0.1:8000/books/1/borrow \
 - **Date handling uses more than one clock.** Due dates are calculated in UTC, the overdue check uses the server's local date, and `borrowed_at` uses the database's date. These can disagree near midnight on a server not set to UTC.
 - **CORS origin is hardcoded.** It should come from configuration, like the database URL, before deployment.
 - **The borrow log is a local file.** It is lost on redeployment and would not work across multiple server instances; a real system would use a proper log store or task queue.
-- **No automated tests yet.** A pytest suite covering the borrowing rules and the authorization checks is the next addition, followed by containerisation with Docker and a CI pipeline.
 - **No rate limiting on login.** Adding it would slow down password guessing.
