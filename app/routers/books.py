@@ -117,8 +117,8 @@ async def borrow_book(
             detail="You already have a copy of this book",
         )
     # if every copy is already on loan
-    stmt = select(func.count(Loan.id)).where(and_(Loan.book == book, Loan.returned_at.is_(None)))
-    active_loans = await db.scalar(stmt)
+    stmt2 = select(func.count(Loan.id)).where(and_(Loan.book == book, Loan.returned_at.is_(None)))
+    active_loans = (await db.execute(stmt2)).scalar_one()
     if book.total_copies <= active_loans:
         raise HTTPException(
             status_code=409,

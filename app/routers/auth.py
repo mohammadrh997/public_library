@@ -31,10 +31,9 @@ async def create_member(payload: MemberCreate, db: DBsession):
 @router.post("/token")
 async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBsession):
     member = (await db.scalars(select(Member).where(Member.email == form_data.username))).first()
-    password_ok = member is not None and await run_in_threadpool(
+    if member is None or not await run_in_threadpool(
         verify_password, form_data.password, member.hashed_password
-    )
-    if not password_ok:
+    ):
         raise HTTPException(
             status_code=401,
             detail="Incorrect email or password",

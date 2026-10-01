@@ -23,17 +23,19 @@ DBsession = Annotated[AsyncSession, Depends(get_db)]
 async def get_current_member(
     token: Annotated[str, Depends(oauth2_scheme)], db: DBsession
 ) -> Member:
-    member_id = verify_token(token)
-    # check for User Return None or Return non integer value
+    credentials_error = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    subject = verify_token(token)
+    if subject is None:
+        raise credentials_error
     try:
-        member_id = int(member_id)
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=401,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
-
+        member_id = int(subject)
+    except ValueError:
+        raise credentials_error from None
+    
     member = await db.get(Member, member_id)
     if member is None:
         raise HTTPException(status_code=401, detail="Member no longer exists")
