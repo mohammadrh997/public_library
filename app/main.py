@@ -30,7 +30,7 @@ app.include_router(auth.router)
 app.include_router(books.router)
 app.include_router(loans.router)
 
-app.add_exception_handler(ResourceNotFound, resource_not_found_handler) #type: ignore[arg-type]
+app.add_exception_handler(ResourceNotFound, resource_not_found_handler)  # type: ignore[arg-type]
 app.add_exception_handler(Exception, exp_haneler)
 
 

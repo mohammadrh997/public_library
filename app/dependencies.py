@@ -35,7 +35,7 @@ async def get_current_member(
         member_id = int(subject)
     except ValueError:
         raise credentials_error from None
-    
+
     member = await db.get(Member, member_id)
     if member is None:
         raise HTTPException(status_code=401, detail="Member no longer exists")
