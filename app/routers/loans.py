@@ -1,20 +1,15 @@
-from typing import Annotated
 import logging
-from datetime import datetime, timedelta, timezone, date
+from datetime import UTC, date, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, status, HTTPException, Depends
-from fastapi.concurrency import run_in_threadpool
-
-from sqlalchemy import select, and_, func
-from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
-from app.models import Book, Loan
-from app.schemas import(LoanReadBook,LoanReadBookMember ,LoanRead)
-from app.dependencies import DBsession, CurrentMember, require_librarian, pagination_params
-
-
+from app.dependencies import CurrentMember, DBsession, pagination_params, require_librarian
+from app.models import Loan
+from app.schemas import LoanRead, LoanReadBook, LoanReadBookMember
 
 router = APIRouter(prefix="/loans", tags=["loans"])
 PaginationDep = Annotated[dict, Depends(pagination_params)]
@@ -23,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 @router.get("/me", response_model=list[LoanReadBook])
 async def get_loans(member: CurrentMember, db: DBsession):
-    loans = (await db.scalars(select(Loan).where(Loan.member == member).options(selectinload(Loan.book)))).all()
+    loans = (
+        await db.scalars(select(Loan).where(Loan.member == member).options(selectinload(Loan.book)))
+    ).all()
     return loans
 
 
@@ -36,7 +33,7 @@ async def return_book(loan_id: int, member: CurrentMember, db: DBsession):
         raise HTTPException(status_code=403, detail="Unauthorized changes")
     if loan.returned_at:
         raise HTTPException(status_code=409, detail="This book has already been returned")
-    loan.returned_at = datetime.now(timezone.utc)
+    loan.returned_at = datetime.now(UTC)
     try:
         await db.commit()
     except IntegrityError as e:
@@ -46,8 +43,15 @@ async def return_book(loan_id: int, member: CurrentMember, db: DBsession):
     await db.refresh(loan)
     return loan
 
-@router.get("/overdue", response_model= list[LoanReadBookMember], dependencies=[Depends(require_librarian)])
+
+@router.get(
+    "/overdue", response_model=list[LoanReadBookMember], dependencies=[Depends(require_librarian)]
+)
 async def get_overdue_loans(db: DBsession):
-    stmt = select(Loan).where(Loan.returned_at == None, Loan.due_date < date.today()).options(selectinload(Loan.book), selectinload(Loan.member))
+    stmt = (
+        select(Loan)
+        .where(Loan.returned_at == None, Loan.due_date < date.today())
+        .options(selectinload(Loan.book), selectinload(Loan.member))
+    )
     loans = (await db.scalars(stmt)).all()
     return loans

@@ -1,7 +1,7 @@
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey, func, false
 from datetime import date
 
+from sqlalchemy import ForeignKey, false, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -16,7 +16,6 @@ class Member(Base):
     is_librarian: Mapped[bool] = mapped_column(server_default=false())
     joined_date: Mapped[date] = mapped_column(server_default=func.current_date())
     loans: Mapped[list["Loan"]] = relationship(back_populates="member")
-
 
 
 class Book(Base):
@@ -40,4 +39,4 @@ class Loan(Base):
     member: Mapped["Member"] = relationship(back_populates="loans")
     borrowed_at: Mapped[date] = mapped_column(server_default=func.current_date())
     due_date: Mapped[date]
-    returned_at : Mapped[date | None] = mapped_column(nullable=True)
+    returned_at: Mapped[date | None] = mapped_column(nullable=True)

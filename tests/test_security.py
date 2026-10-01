@@ -1,12 +1,12 @@
 import base64
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
 
 from app.config import settings
-from app.security import create_access_token, verify_token, hash_password, verify_password
+from app.security import create_access_token, hash_password, verify_password, verify_token
 
 
 def test_hash_is_not_the_password():
@@ -32,7 +32,7 @@ def test_token_round_trip_returns_the_subject():
 
 def test_expired_token_is_rejected():
     expired = jwt.encode(
-        {"sub": "42", "exp": datetime.now(timezone.utc) - timedelta(minutes=1)},
+        {"sub": "42", "exp": datetime.now(UTC) - timedelta(minutes=1)},
         settings.secret_key,
         algorithm=settings.algorithm,
     )
@@ -47,7 +47,9 @@ def test_token_signed_with_another_key_is_rejected():
 def test_token_with_an_edited_payload_is_rejected():
     token = create_access_token("42")
     header, _payload, signature = token.split(".")
-    forged_payload = base64.urlsafe_b64encode(json.dumps({"sub": "1"}).encode()).rstrip(b"=").decode()
+    forged_payload = (
+        base64.urlsafe_b64encode(json.dumps({"sub": "1"}).encode()).rstrip(b"=").decode()
+    )
     forged_token = f"{header}.{forged_payload}.{signature}"
     assert verify_token(forged_token) is None
 
@@ -66,9 +68,15 @@ def test_verify(password, should_match):
     assert verify_password(password, hashed) is should_match
 
 
-
-@pytest.mark.parametrize("password, wrong_password",
-                        [("", "  "), ("154@@AAbb", "154@@AAbB"), ("5497!SSaSDA", "5497!SsaSDA"), ("H#aSEwq?zxc454 ", "H#aSEwq?zXc454 ")])
+@pytest.mark.parametrize(
+    "password, wrong_password",
+    [
+        ("", "  "),
+        ("154@@AAbb", "154@@AAbB"),
+        ("5497!SSaSDA", "5497!SsaSDA"),
+        ("H#aSEwq?zxc454 ", "H#aSEwq?zXc454 "),
+    ],
+)
 def test_verify_rejects_near_miss_passwords(password, wrong_password):
     hashed_password = hash_password(password)
     assert verify_password(wrong_password, hashed_password) is False

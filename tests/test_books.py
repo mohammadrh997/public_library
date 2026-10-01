@@ -31,7 +31,9 @@ async def test_duplicate_isbn_is_a_conflict(client, librarian_headers, book):
 
 
 async def test_patch_changes_only_the_fields_sent(client, librarian_headers, book):
-    response = await client.patch(f"/books/{book['id']}", headers=librarian_headers, json={"title": "Dune Messiah"})
+    response = await client.patch(
+        f"/books/{book['id']}", headers=librarian_headers, json={"title": "Dune Messiah"}
+    )
     assert response.status_code == 200
     updated = response.json()
     assert updated["title"] == "Dune Messiah"

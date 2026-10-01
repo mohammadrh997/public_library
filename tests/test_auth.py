@@ -13,7 +13,12 @@ async def test_register_returns_member_without_password(client):
 async def test_register_cannot_grant_librarian(client):
     response = await client.post(
         "/auth/register",
-        json={"email": "sneaky@example.com", "name": "S", "password": "password123", "is_librarian": True},
+        json={
+            "email": "sneaky@example.com",
+            "name": "S",
+            "password": "password123",
+            "is_librarian": True,
+        },
     )
     assert response.json()["is_librarian"] is False
 
@@ -26,9 +31,15 @@ async def test_duplicate_email_is_rejected(client):
 
 
 async def test_wrong_password_and_unknown_email_look_identical(client):
-    await client.post("/auth/register", json={"email": "real@example.com", "name": "R", "password": "password123"})
-    wrong_password = await client.post("/auth/token", data={"username": "real@example.com", "password": "nope-nope"})
-    unknown_email = await client.post("/auth/token", data={"username": "ghost@example.com", "password": "nope-nope"})
+    await client.post(
+        "/auth/register", json={"email": "real@example.com", "name": "R", "password": "password123"}
+    )
+    wrong_password = await client.post(
+        "/auth/token", data={"username": "real@example.com", "password": "nope-nope"}
+    )
+    unknown_email = await client.post(
+        "/auth/token", data={"username": "ghost@example.com", "password": "nope-nope"}
+    )
     assert wrong_password.status_code == unknown_email.status_code == 401
     assert wrong_password.json() == unknown_email.json()
 

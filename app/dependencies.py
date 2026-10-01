@@ -1,18 +1,15 @@
-from typing import Annotated
 from collections.abc import AsyncGenerator
-
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, Query
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
-from app.security import verify_token
 from app.models import Member
-
+from app.security import verify_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -23,9 +20,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 DBsession = Annotated[AsyncSession, Depends(get_db)]
 
 
-async def get_current_member(token: Annotated[str, Depends(oauth2_scheme)], db: DBsession) -> Member:
+async def get_current_member(
+    token: Annotated[str, Depends(oauth2_scheme)], db: DBsession
+) -> Member:
     member_id = verify_token(token)
-    #check for User Return None or Return non integer value
+    # check for User Return None or Return non integer value
     try:
         member_id = int(member_id)
     except (ValueError, TypeError):
@@ -34,7 +33,7 @@ async def get_current_member(token: Annotated[str, Depends(oauth2_scheme)], db: 
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     member = await db.get(Member, member_id)
     if member is None:
         raise HTTPException(status_code=401, detail="Member no longer exists")
@@ -43,13 +42,11 @@ async def get_current_member(token: Annotated[str, Depends(oauth2_scheme)], db: 
 
 CurrentMember = Annotated[Member, Depends(get_current_member)]
 
+
 async def require_librarian(member: CurrentMember):
     if not member.is_librarian:
         raise HTTPException(status_code=403, detail="Admin access required")
 
 
-def pagination_params(
-        skip: int = Query(0, ge=0),
-        limit: int = Query(10, ge=1, le=100)
-        ):
+def pagination_params(skip: int = Query(0, ge=0), limit: int = Query(10, ge=1, le=100)):
     return {"skip": skip, "limit": limit}

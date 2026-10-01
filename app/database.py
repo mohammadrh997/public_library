@@ -1,13 +1,12 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import MetaData
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
 
-
 engine = create_async_engine(settings.database_url)
 
-AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False) 
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -17,5 +16,6 @@ NAMING_CONVENTION = {
     "pk": "pk_%(table_name)s",
 }
 
+
 class Base(DeclarativeBase):
-    metadata = MetaData(naming_convention= NAMING_CONVENTION)
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)

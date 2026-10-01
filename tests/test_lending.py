@@ -10,7 +10,9 @@ async def test_cannot_borrow_the_same_book_twice(client, member_headers, book):
     assert response.status_code == 409
 
 
-async def test_cannot_borrow_when_every_copy_is_out(client, librarian_headers, member_headers, other_member_headers):
+async def test_cannot_borrow_when_every_copy_is_out(
+    client, librarian_headers, member_headers, other_member_headers
+):
     created = await client.post(
         "/books",
         headers=librarian_headers,
@@ -22,7 +24,9 @@ async def test_cannot_borrow_when_every_copy_is_out(client, librarian_headers, m
     assert response.status_code == 409
 
 
-async def test_member_cannot_return_someone_elses_loan(client, member_headers, other_member_headers, book):
+async def test_member_cannot_return_someone_elses_loan(
+    client, member_headers, other_member_headers, book
+):
     loan = (await client.post(f"/books/{book['id']}/borrow", headers=member_headers)).json()
     response = await client.post(f"/loans/{loan['id']}/return", headers=other_member_headers)
     assert response.status_code == 403

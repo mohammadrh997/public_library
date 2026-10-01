@@ -1,5 +1,7 @@
 import os
+
 from dotenv import load_dotenv
+
 load_dotenv()
 from sqlalchemy.engine import make_url
 
@@ -94,6 +96,11 @@ async def book(client, librarian_headers):
     response = await client.post(
         "/books",
         headers=librarian_headers,
-        json={"title": "Dune", "author": "Frank Herbert", "isbn": "9780441013593", "total_copies": 2},
+        json={
+            "title": "Dune",
+            "author": "Frank Herbert",
+            "isbn": "9780441013593",
+            "total_copies": 2,
+        },
     )
     return response.json()

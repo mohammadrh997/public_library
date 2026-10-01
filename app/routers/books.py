@@ -1,20 +1,16 @@
-from typing import Annotated
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, status, HTTPException, Depends, BackgroundTasks
-from fastapi.concurrency import run_in_threadpool
-
-from sqlalchemy import select, and_, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Book, Loan
+from app.dependencies import CurrentMember, DBsession, pagination_params, require_librarian
 from app.exceptions import ResourceNotFound
-from app.schemas import(BookRead, BookCreate, BookUpdate, LoanRead)
-from app.dependencies import DBsession, CurrentMember, require_librarian, pagination_params
-
-
+from app.models import Book, Loan
+from app.schemas import BookCreate, BookRead, BookUpdate, LoanRead
 
 router = APIRouter(prefix="/books", tags=["books"])
 PaginationDep = Annotated[dict, Depends(pagination_params)]
@@ -27,9 +23,10 @@ async def fetch_book(book_id: int, db: AsyncSession) -> Book:
         raise ResourceNotFound("book", book_id)
     return book
 
+
 def append_log(book: Book):
     with open("lending_log.txt", "a") as file:
-        file.write(f"Book number {book.id} was successfully borrowed at {datetime.now(timezone.utc)}\n")
+        file.write(f"Book number {book.id} was successfully borrowed at {datetime.now(UTC)}\n")
 
 
 @router.get("", response_model=list[BookRead])
@@ -41,13 +38,19 @@ async def get_books(db: DBsession, pagation: PaginationDep, search: None | str =
     books = (await db.scalars(stmt)).all()
     return books
 
-@router.get("/{book_id}", response_model= BookRead)
+
+@router.get("/{book_id}", response_model=BookRead)
 async def get_book(book_id: int, db: DBsession):
     book = await fetch_book(book_id, db)
     return book
 
 
-@router.post("", response_model= BookRead, status_code=status.HTTP_201_CREATED, dependencies=[(Depends(require_librarian))])
+@router.post(
+    "",
+    response_model=BookRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[(Depends(require_librarian))],
+)
 async def add_book(payload: BookCreate, db: DBsession):
     book = Book(**payload.model_dump())
     db.add(book)
@@ -80,7 +83,12 @@ async def patch_book(book_id: int, payload: BookUpdate, db: DBsession):
     await db.refresh(book)
     return book
 
-@router.delete("/{book_id}", dependencies=[(Depends(require_librarian))], status_code=status.HTTP_204_NO_CONTENT)
+
+@router.delete(
+    "/{book_id}",
+    dependencies=[(Depends(require_librarian))],
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def delete_book(book_id: int, db: DBsession):
     book = await fetch_book(book_id, db)
     try:
@@ -94,28 +102,29 @@ async def delete_book(book_id: int, db: DBsession):
         )
 
 
-
 @router.post("/{book_id}/borrow", response_model=LoanRead, status_code=status.HTTP_201_CREATED)
-async def borrow_book(book_id: int, member: CurrentMember, db: DBsession, backgrounder: BackgroundTasks):
+async def borrow_book(
+    book_id: int, member: CurrentMember, db: DBsession, backgrounder: BackgroundTasks
+):
     book = await fetch_book(book_id, db)
-    
+
     # if this member already has an unreturned loan of this book
     stmt = select(Loan).where(Loan.book == book, Loan.member == member, Loan.returned_at == None)
     loans = (await db.scalars(stmt)).all()
     if loans:
         raise HTTPException(
-                status_code=409,
-                detail="You already have a copy of this book",
-            )
+            status_code=409,
+            detail="You already have a copy of this book",
+        )
     # if every copy is already on loan
     stmt = select(func.count(Loan.id)).where(and_(Loan.book == book, Loan.returned_at == None))
     active_loans = await db.scalar(stmt)
     if book.total_copies <= active_loans:
         raise HTTPException(
-                    status_code=409,
-                    detail="The book has no available copies",
-                )
-    due_date = datetime.now(timezone.utc) + timedelta(days= 14)
+            status_code=409,
+            detail="The book has no available copies",
+        )
+    due_date = datetime.now(UTC) + timedelta(days=14)
     loan = Loan(book=book, member=member, due_date=due_date)
     db.add(loan)
     try:

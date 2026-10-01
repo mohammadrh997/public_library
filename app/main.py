@@ -1,11 +1,12 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from app.database import engine
 
-import logging
+from app.database import engine
+from app.exceptions import ResourceNotFound, exp_haneler, resource_not_found_handler
 from app.routers import auth, books, loans
-from app.exceptions import ResourceNotFound, resource_not_found_handler, exp_haneler
 
 
 @asynccontextmanager
@@ -14,6 +15,7 @@ async def lifespan(app: FastAPI):
     yield
     print("shutting down")
     await engine.dispose()
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,7 +36,7 @@ app.add_exception_handler(Exception, exp_haneler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins= ["https://myfrontend.com"],
+    allow_origins=["https://myfrontend.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
