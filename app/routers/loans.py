@@ -50,7 +50,7 @@ async def return_book(loan_id: int, member: CurrentMember, db: DBsession):
 async def get_overdue_loans(db: DBsession):
     stmt = (
         select(Loan)
-        .where(Loan.returned_at == None, Loan.due_date < date.today())
+        .where(Loan.returned_at.is_(None), Loan.due_date < date.today())
         .options(selectinload(Loan.book), selectinload(Loan.member))
     )
     loans = (await db.scalars(stmt)).all()

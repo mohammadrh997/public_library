@@ -56,12 +56,12 @@ async def add_book(payload: BookCreate, db: DBsession):
     db.add(book)
     try:
         await db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         await db.rollback()
         raise HTTPException(
             status_code=409,
             detail="the ISBN already exists",
-        )
+        ) from exc
     await db.refresh(book)
     return book
 
@@ -73,13 +73,13 @@ async def patch_book(book_id: int, payload: BookUpdate, db: DBsession):
         setattr(book, field, value)
     try:
         await db.commit()
-    except IntegrityError as e:
+    except IntegrityError as exc:
         await db.rollback()
-        logger.error(e)
+        logger.error(exc)
         raise HTTPException(
             status_code=409,
             detail="the ISBN already exists",
-        )
+        ) from exc
     await db.refresh(book)
     return book
 
@@ -94,12 +94,12 @@ async def delete_book(book_id: int, db: DBsession):
     try:
         await db.delete(book)
         await db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         await db.rollback()
         raise HTTPException(
             status_code=409,
             detail="Cannot delete this book because it has loan records.",
-        )
+        ) from exc
 
 
 @router.post("/{book_id}/borrow", response_model=LoanRead, status_code=status.HTTP_201_CREATED)
@@ -109,7 +109,7 @@ async def borrow_book(
     book = await fetch_book(book_id, db)
 
     # if this member already has an unreturned loan of this book
-    stmt = select(Loan).where(Loan.book == book, Loan.member == member, Loan.returned_at == None)
+    stmt = select(Loan).where(Loan.book == book, Loan.member == member, Loan.returned_at.is_(None))
     loans = (await db.scalars(stmt)).all()
     if loans:
         raise HTTPException(
@@ -117,7 +117,7 @@ async def borrow_book(
             detail="You already have a copy of this book",
         )
     # if every copy is already on loan
-    stmt = select(func.count(Loan.id)).where(and_(Loan.book == book, Loan.returned_at == None))
+    stmt = select(func.count(Loan.id)).where(and_(Loan.book == book, Loan.returned_at.is_(None)))
     active_loans = await db.scalar(stmt)
     if book.total_copies <= active_loans:
         raise HTTPException(

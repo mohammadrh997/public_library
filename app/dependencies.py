@@ -27,12 +27,12 @@ async def get_current_member(
     # check for User Return None or Return non integer value
     try:
         member_id = int(member_id)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=401,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from exc
 
     member = await db.get(Member, member_id)
     if member is None:
