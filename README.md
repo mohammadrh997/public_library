@@ -25,6 +25,8 @@ A REST API for a public library's lending system. Librarians manage the catalogu
 | Authentication | JWT via PyJWT, passwords hashed with Argon2 via `pwdlib` |
 | Configuration | `pydantic-settings` reading from `.env` |
 | Testing | pytest, pytest-asyncio, httpx2 |
+| Code quality | Ruff, mypy, pre-commit |
+| Containers | Docker |
 
 ## Project structure
 
@@ -43,6 +45,9 @@ app/
         books.py       catalogue management and borrowing
         loans.py       a member's loans, returns, overdue report
 alembic/               database migrations
+tests/                 unit and API tests
+Dockerfile             container image definition
+start.sh               container entry point: runs migrations, then starts the server
 ```
 
 ## Getting started
@@ -147,6 +152,22 @@ Its name must contain `test`, or the suite refuses to run, because the tests del
 pytest -q
 ```
 
+### 8. Run with Docker
+
+Build the image:
+
+```bash
+docker build -t library-api .
+```
+
+Run it against PostgreSQL on your machine, replacing `USER`, `PASSWORD`, and the database name:
+
+```bash
+docker run --rm -p 8000:8000 --env-file .env -e DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@host.docker.internal/library library-api
+```
+
+Inside a container, `localhost` means the container itself, so the database address is overridden with `host.docker.internal`, which reaches your machine on Docker Desktop. Migrations run automatically when the container starts, and `.env` is never copied into the image.
+
 ## API reference
 
 | Method | Path | Access | Description |
@@ -206,12 +227,11 @@ curl -X POST http://127.0.0.1:8000/books/1/borrow \
 
 **Migrations are reversible.** The declarative base uses a constraint naming convention, so every constraint has a predictable name written into the migration file. Without it, PostgreSQL names constraints itself, and downgrades that drop a constraint fail because the migration does not know the name.
 
-**Logging borrows does not slow borrowing.** Each successful borrow is written to a log file as a background task, which runs after the response has been sent.
+**Logging borrows does not slow borrowing.** Each successful borrow is logged as a background task, which runs after the response has been sent. It goes to standard output rather than a file, so it survives in the platform's logs when a container is replaced.
 
 ## Known limitations and next steps
 
 - **Concurrent borrowing of the last copy.** Borrowing checks the number of free copies and then creates the loan. Two requests arriving at the same moment could both pass the check. Locking the relevant rows with `SELECT ... FOR UPDATE` inside the transaction would close this.
 - **Date handling uses more than one clock.** Due dates are calculated in UTC, the overdue check uses the server's local date, and `borrowed_at` uses the database's date. These can disagree near midnight on a server not set to UTC.
 - **CORS origin is hardcoded.** It should come from configuration, like the database URL, before deployment.
-- **The borrow log is a local file.** It is lost on redeployment and would not work across multiple server instances; a real system would use a proper log store or task queue.
 - **No rate limiting on login.** Adding it would slow down password guessing.

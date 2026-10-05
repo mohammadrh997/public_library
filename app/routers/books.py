@@ -25,8 +25,7 @@ async def fetch_book(book_id: int, db: AsyncSession) -> Book:
 
 
 def append_log(book: Book):
-    with open("lending_log.txt", "a") as file:
-        file.write(f"Book number {book.id} was successfully borrowed at {datetime.now(UTC)}\n")
+    logger.info("Book %s was borrowed", book.id)
 
 
 @router.get("", response_model=list[BookRead])
