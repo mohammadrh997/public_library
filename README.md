@@ -47,10 +47,61 @@ app/
 alembic/               database migrations
 tests/                 unit and API tests
 Dockerfile             container image definition
+compose.yaml           local stack: PostgreSQL, Redis, and the API
 start.sh               container entry point: runs migrations, then starts the server
 ```
 
-## Getting started
+## Quick start with Docker Compose
+
+The fastest way to run everything. You only need Docker; PostgreSQL and Python do not have to be installed.
+
+```bash
+git clone https://github.com/mohammadrh997/public_library.git
+cd public_library
+cp .env.example .env
+```
+
+Set `SECRET_KEY` in `.env` (see step 3 below for how to generate one). Compose refuses to start without it. Then:
+
+```bash
+docker compose up --build
+```
+
+This starts three containers: PostgreSQL 18, Redis, and the API. The API waits until the database reports healthy, runs the migrations, and serves at `http://localhost:8000`, with documentation at `http://localhost:8000/docs`.
+
+Promote a registered member to librarian:
+
+```bash
+docker compose exec db psql -U library -d library -c "UPDATE members SET is_librarian = true WHERE email = 'librarian@example.com';"
+```
+
+Inside the stack the API reaches the database at `db:5432`. The database is also published on your machine at `localhost:5433` (user and password `library`), so it does not clash with a PostgreSQL already installed on port 5432.
+
+**Running the tests against the Compose database.** Create the test database once:
+
+```bash
+docker compose exec db psql -U library -d library -c "CREATE DATABASE library_test;"
+```
+
+Then run the suite through the published port. On Linux or macOS:
+
+```bash
+TEST_DATABASE_URL=postgresql+asyncpg://library:library@localhost:5433/library_test pytest -q
+```
+
+In Windows PowerShell:
+
+```powershell
+$env:TEST_DATABASE_URL = "postgresql+asyncpg://library:library@localhost:5433/library_test"
+pytest -q
+Remove-Item Env:TEST_DATABASE_URL
+```
+
+**Stopping.** `docker compose down` stops and removes the containers but keeps all data, including `library_test`, in the `pgdata` volume. `docker compose down -v` also deletes the volume: every member, book, and loan, and the test database, which must then be created again.
+
+After changing code, `requirements.txt`, or the Dockerfile, use `docker compose up --build`; without `--build`, Compose reuses the previous image.
+
+## Getting started without Docker
 
 ### Prerequisites
 
@@ -106,6 +157,7 @@ cp .env.example .env
 | `SECRET_KEY` | yes | Signs the JWT tokens. Keep it secret. |
 | `ALGORITHM` | no | JWT signing algorithm, default `HS256` |
 | `ACCESS_TOKEN_EXP_MINUTES` | no | Token lifetime in minutes, default `30` |
+| `REDIS_URL` | no | Redis connection, default `redis://localhost:6379/0` |
 | `TEST_DATABASE_URL` | for tests | Like `DATABASE_URL`, but for a separate database whose name contains `test` |
 
 Generate a strong secret key with:
