@@ -50,12 +50,12 @@ async def get_books(
     stmt = select(Book).order_by(Book.id)
     if author:
         stmt = stmt.where(Book.author == author)
-    stmt = stmt.offset(pagination.get("skip")).limit(pagination.get("limit"))
+    stmt = stmt.offset(skip).limit(limit)
     books = (await db.scalars(stmt)).all()
 
     result = [BookRead.model_validate(b).model_dump(mode="json") for b in books]
     await cache_set(cache, key, result, ttl=BOOK_LIST_TTL_SECONDS)
-    return books
+    return result
 
 
 @router.get("/{book_id}", response_model=BookRead)

@@ -227,7 +227,7 @@ Inside a container, `localhost` means the container itself, so the database addr
 | POST | `/auth/register` | public | Create a member account |
 | POST | `/auth/token` | public | Log in and receive an access token |
 | GET | `/auth/me` | member | The current member's details |
-| GET | `/books` | public | List books. Query parameters: `skip`, `limit` (max 100), `auther` (author name) |
+| GET | `/books` | public | List books. Query parameters: `skip`, `limit` (max 100), `author` (author name) |
 | GET | `/books/{book_id}` | public | A single book |
 | POST | `/books` | librarian | Add a book |
 | PATCH | `/books/{book_id}` | librarian | Update a book; only the fields sent are changed |
