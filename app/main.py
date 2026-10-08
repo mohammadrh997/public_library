@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.cache import create_redis_client
+from app.config import settings
 from app.database import engine
 from app.exceptions import ResourceNotFound, exp_haneler, resource_not_found_handler
 from app.routers import auth, books, loans
@@ -11,9 +13,9 @@ from app.routers import auth, books, loans
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("starting  up")
+    app.state.redis = create_redis_client(settings.redis_url)
     yield
-    print("shutting down")
+    await app.state.redis.aclose()
     await engine.dispose()
 
 

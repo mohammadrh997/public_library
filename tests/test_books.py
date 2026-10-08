@@ -57,3 +57,12 @@ async def test_missing_book_is_404(client):
 async def test_invalid_books_are_rejected(client, librarian_headers, bad_payload):
     response = await client.post("/books", headers=librarian_headers, json=bad_payload)
     assert response.status_code == 422
+
+
+async def test_matching_etag_returns_304_with_empty_body(client, book):
+    response = await client.get(f"books/{book['id']}")
+    assert response.status_code == 200
+    etag = response.headers["etag"]
+    response2 = await client.get(f"books/{book['id']}", headers={"If-None-Match": etag})
+    assert response2.status_code == 304
+    assert response2.content == b""

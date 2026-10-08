@@ -1,12 +1,22 @@
+import hashlib
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache import (
+    BOOK_LIST_TTL_SECONDS,
+    Cache,
+    book_list_key,
+    cache_get,
+    cache_set,
+    invalidate_book_lists,
+)
 from app.dependencies import CurrentMember, DBsession, pagination_params, require_librarian
 from app.exceptions import ResourceNotFound
 from app.models import Book, Loan
@@ -29,19 +39,37 @@ def append_log(book: Book):
 
 
 @router.get("", response_model=list[BookRead])
-async def get_books(db: DBsession, pagation: PaginationDep, search: None | str = None):
+async def get_books(
+    db: DBsession, cache: Cache, pagination: PaginationDep, author: None | str = None
+):
+    skip, limit = pagination["skip"], pagination["limit"]
+    key = book_list_key(skip, limit, author)
+    cached = await cache_get(cache, key)
+    if cached is not None:
+        return cached
     stmt = select(Book).order_by(Book.id)
-    if search:
-        stmt = stmt.where(Book.author == search)
-    stmt = stmt.offset(pagation.get("skip")).limit(pagation.get("limit"))
+    if author:
+        stmt = stmt.where(Book.author == author)
+    stmt = stmt.offset(pagination.get("skip")).limit(pagination.get("limit"))
     books = (await db.scalars(stmt)).all()
+
+    result = [BookRead.model_validate(b).model_dump(mode="json") for b in books]
+    await cache_set(cache, key, result, ttl=BOOK_LIST_TTL_SECONDS)
     return books
 
 
 @router.get("/{book_id}", response_model=BookRead)
-async def get_book(book_id: int, db: DBsession):
+async def get_book(book_id: int, db: DBsession, request: Request, response: Response):
     book = await fetch_book(book_id, db)
-    return book
+    body = BookRead.model_validate(book).model_dump(mode="json")
+    etag = '"' + hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()[:16] + '"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(
+            status_code=304, headers={"ETag": etag, "Cache-Control": "public, max-age=60"}
+        )
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = "public, max-age=60"
+    return body
 
 
 @router.post(
@@ -50,7 +78,7 @@ async def get_book(book_id: int, db: DBsession):
     status_code=status.HTTP_201_CREATED,
     dependencies=[(Depends(require_librarian))],
 )
-async def add_book(payload: BookCreate, db: DBsession):
+async def add_book(payload: BookCreate, db: DBsession, cache: Cache):
     book = Book(**payload.model_dump())
     db.add(book)
     try:
@@ -62,11 +90,12 @@ async def add_book(payload: BookCreate, db: DBsession):
             detail="the ISBN already exists",
         ) from exc
     await db.refresh(book)
+    await invalidate_book_lists(cache)
     return book
 
 
 @router.patch("/{book_id}", response_model=BookRead, dependencies=[(Depends(require_librarian))])
-async def patch_book(book_id: int, payload: BookUpdate, db: DBsession):
+async def patch_book(book_id: int, payload: BookUpdate, db: DBsession, cache: Cache):
     book = await fetch_book(book_id, db)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(book, field, value)
@@ -74,12 +103,12 @@ async def patch_book(book_id: int, payload: BookUpdate, db: DBsession):
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
-        logger.error(exc)
         raise HTTPException(
             status_code=409,
             detail="the ISBN already exists",
         ) from exc
     await db.refresh(book)
+    await invalidate_book_lists(cache)
     return book
 
 
@@ -88,7 +117,7 @@ async def patch_book(book_id: int, payload: BookUpdate, db: DBsession):
     dependencies=[(Depends(require_librarian))],
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_book(book_id: int, db: DBsession):
+async def delete_book(book_id: int, db: DBsession, cache: Cache):
     book = await fetch_book(book_id, db)
     try:
         await db.delete(book)
@@ -99,6 +128,7 @@ async def delete_book(book_id: int, db: DBsession):
             status_code=409,
             detail="Cannot delete this book because it has loan records.",
         ) from exc
+    await invalidate_book_lists(cache)
 
 
 @router.post("/{book_id}/borrow", response_model=LoanRead, status_code=status.HTTP_201_CREATED)

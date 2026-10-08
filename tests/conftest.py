@@ -104,3 +104,17 @@ async def book(client, librarian_headers):
         },
     )
     return response.json()
+
+
+@pytest.fixture
+def insert_book_directly():
+    async def insert(title, isbn):
+        async with test_engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO books (title, author, isbn, total_copies) VALUES (:t, 'A', :i, 1)"
+                ),
+                {"t": title, "i": isbn},
+            )
+
+    return insert
