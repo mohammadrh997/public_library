@@ -1,5 +1,7 @@
 # Public Library Lending API
 
+![CI](https://github.com/mohammadrh997/public_library/actions/workflows/ci.yml/badge.svg)
+
 A REST API for a public library's lending system. Librarians manage the catalogue; members borrow and return books. Built with FastAPI, async SQLAlchemy, and PostgreSQL, with JWT authentication and role-based access.
 
 ## Features

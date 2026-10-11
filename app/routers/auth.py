@@ -13,6 +13,7 @@ from app.schemas import MemberCreate, MemberRead
 from app.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+# Verified against when the email is unknown, so both login paths cost one Argon2 check.
 DUMMY_HASH = hash_password("not-a-real-password")
 
 
