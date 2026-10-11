@@ -14,10 +14,10 @@ from app.routers import auth, books, health, loans
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.redis = create_redis_client(settings.redis_url)
-    app.state.limiter = limiter
+    app.state.redis = create_redis_client(settings.redis_url) if settings.redis_url else None
     yield
-    await app.state.redis.aclose()
+    if app.state.redis is not None:
+        await app.state.redis.aclose()
     await engine.dispose()
 
 
@@ -28,6 +28,7 @@ logging.basicConfig(
 
 
 app = FastAPI(title="Library", lifespan=lifespan)
+app.state.limiter = limiter
 
 
 app.include_router(auth.router)

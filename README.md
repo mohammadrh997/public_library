@@ -12,6 +12,9 @@ A REST API for a public library's lending system. Librarians manage the catalogu
 - Overdue loan report for librarians
 - Borrow events logged in the background without delaying the response
 - Reversible database migrations with Alembic
+- Book list cached in Redis, with `ETag` and `304 Not Modified` support on book details
+- Login rate limited to 5 attempts per minute per client
+- Health check endpoint for hosting platforms
 
 ## Tech stack
 
@@ -26,7 +29,9 @@ A REST API for a public library's lending system. Librarians manage the catalogu
 | Configuration | `pydantic-settings` reading from `.env` |
 | Testing | pytest, pytest-asyncio, httpx2 |
 | Code quality | Ruff, mypy, pre-commit |
-| Containers | Docker |
+| Caching | Redis via `redis.asyncio` |
+| Rate limiting | slowapi |
+| Containers | Docker, Docker Compose |
 
 ## Project structure
 
@@ -40,10 +45,13 @@ app/
     security.py        password hashing and JWT creation/verification
     dependencies.py    database session, current member, librarian guard, pagination
     exceptions.py      custom exceptions and their handlers
+    cache.py           Redis client, cache helpers, invalidation
+    rate_limit.py      the shared slowapi limiter
     routers/
         auth.py        register, login, current member
         books.py       catalogue management and borrowing
         loans.py       a member's loans, returns, overdue report
+        health.py      health check for the hosting platform
 alembic/               database migrations
 tests/                 unit and API tests
 Dockerfile             container image definition
@@ -157,7 +165,9 @@ cp .env.example .env
 | `SECRET_KEY` | yes | Signs the JWT tokens. Keep it secret. |
 | `ALGORITHM` | no | JWT signing algorithm, default `HS256` |
 | `ACCESS_TOKEN_EXP_MINUTES` | no | Token lifetime in minutes, default `30` |
-| `REDIS_URL` | no | Redis connection, default `redis://localhost:6379/0` |
+| `REDIS_URL` | no | Redis connection, for example `redis://localhost:6379/0`. Caching is off when unset |
+| `CORS_ORIGINS` | no | Allowed origins as a JSON list, default `["http://localhost:3000"]` |
+| `LOG_LEVEL` | no | Logging level, default `INFO` |
 | `TEST_DATABASE_URL` | for tests | Like `DATABASE_URL`, but for a separate database whose name contains `test` |
 
 Generate a strong secret key with:
@@ -198,7 +208,9 @@ Create a separate test database owned by the same user:
 CREATE DATABASE library_test OWNER library_app;
 ```
 
-Its name must contain `test`, or the suite refuses to run, because the tests delete every row after each test. Set `TEST_DATABASE_URL` in `.env`, then run:
+Its name must contain `test`, or the suite refuses to run, because the tests delete every row after each test. Set `TEST_DATABASE_URL` in `.env`.
+
+The cache and rate-limit tests also need Redis. Start it with `docker compose up -d redis`, which publishes it on `localhost:6379`. Then run:
 
 ```bash
 pytest -q
@@ -236,6 +248,7 @@ Inside a container, `localhost` means the container itself, so the database addr
 | GET | `/loans/me` | member | The current member's loans, with book details |
 | POST | `/loans/{loan_id}/return` | member | Return one of your own loans |
 | GET | `/loans/overdue` | librarian | Unreturned loans past their due date, with book and member details |
+| GET | `/health` | public | `200` when the database is reachable, `503` when it is not |
 
 Protected endpoints expect the token in an `Authorization: Bearer <token>` header. In `/docs`, the **Authorize** button handles this for you.
 
@@ -248,6 +261,7 @@ Protected endpoints expect the token in an `Authorization: Bearer <token>` heade
 | 404 | The requested book or loan does not exist |
 | 409 | Conflicts with current state: duplicate email or ISBN, borrowing a book with no free copies or one you already have, returning a loan twice, deleting a book with loan history |
 | 422 | Invalid input |
+| 429 | Too many login attempts; wait a minute and try again |
 | 500 | Unexpected server error. Details are logged server-side and never returned to the client |
 
 ## Example
@@ -279,11 +293,14 @@ curl -X POST http://127.0.0.1:8000/books/1/borrow \
 
 **Migrations are reversible.** The declarative base uses a constraint naming convention, so every constraint has a predictable name written into the migration file. Without it, PostgreSQL names constraints itself, and downgrades that drop a constraint fail because the migration does not know the name.
 
+**The cache is an optimisation, never a dependency.** Every Redis call is wrapped so that a Redis failure falls back to the database with a logged warning, instead of an error for the user. Cached lists expire after 60 seconds and are invalidated whenever a book is added, changed, or deleted, after the database commit succeeds.
+
+**Login is rate limited per client address.** Five attempts per minute, counted in Redis so every process shares one limit, with an in-memory fallback so a Redis outage never blocks login.
+
 **Logging borrows does not slow borrowing.** Each successful borrow is logged as a background task, which runs after the response has been sent. It goes to standard output rather than a file, so it survives in the platform's logs when a container is replaced.
 
 ## Known limitations and next steps
 
 - **Concurrent borrowing of the last copy.** Borrowing checks the number of free copies and then creates the loan. Two requests arriving at the same moment could both pass the check. Locking the relevant rows with `SELECT ... FOR UPDATE` inside the transaction would close this.
 - **Date handling uses more than one clock.** Due dates are calculated in UTC, the overdue check uses the server's local date, and `borrowed_at` uses the database's date. These can disagree near midnight on a server not set to UTC.
-- **CORS origin is hardcoded.** It should come from configuration, like the database URL, before deployment.
-- **No rate limiting on login.** Adding it would slow down password guessing.
+- **The login limit is per address, not per account.** Clients behind one address share a limit, and a client that can vary its address can get around it. Counting failed attempts per account as well would close this.

@@ -16,12 +16,12 @@ async def test_health_reports_503_when_the_database_is_down(client):
         async with DeadSession() as session:
             yield session
 
-    originl = app.dependency_overrides[get_db]
+    original = app.dependency_overrides[get_db]
     app.dependency_overrides[get_db] = broken_db
     try:
         response = await client.get("/health")
     finally:
-        app.dependency_overrides[get_db] = originl
+        app.dependency_overrides[get_db] = original
         await dead_engine.dispose()
     assert response.status_code == 503
 

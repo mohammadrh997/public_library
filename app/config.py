@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     secret_key: str
     algorithm: str = "HS256"
     access_token_exp_minutes: int = 30
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str | None = None
     log_level: str = "INFO"
     cors_origins: list[str] = ["http://localhost:3000"]
 

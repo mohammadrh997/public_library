@@ -6,7 +6,7 @@ from sqlalchemy import text
 from app.dependencies import DBsession
 
 logger = logging.getLogger(__name__)
-router = APIRouter(tags=["health.py"])
+router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
