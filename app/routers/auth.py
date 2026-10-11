@@ -13,12 +13,13 @@ from app.schemas import MemberCreate, MemberRead
 from app.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+DUMMY_HASH = hash_password("not-a-real-password")
 
 
 @router.post("/register", response_model=MemberRead, status_code=status.HTTP_201_CREATED)
 async def create_member(payload: MemberCreate, db: DBsession):
-    hashed_passowrd = await run_in_threadpool(hash_password, payload.password)
-    member = Member(email=payload.email, name=payload.name, hashed_password=hashed_passowrd)
+    hashed_password = await run_in_threadpool(hash_password, payload.password)
+    member = Member(email=payload.email, name=payload.name, hashed_password=hashed_password)
     db.add(member)
     try:
         await db.commit()
@@ -35,9 +36,9 @@ async def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBsession, request: Request
 ):
     member = (await db.scalars(select(Member).where(Member.email == form_data.username))).first()
-    if member is None or not await run_in_threadpool(
-        verify_password, form_data.password, member.hashed_password
-    ):
+    stored_hash = member.hashed_password if member is not None else DUMMY_HASH
+    password_ok = await run_in_threadpool(verify_password, form_data.password, stored_hash)
+    if member is None or not password_ok:
         raise HTTPException(
             status_code=401,
             detail="Incorrect email or password",
