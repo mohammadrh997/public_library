@@ -27,6 +27,7 @@ from sqlalchemy.pool import NullPool
 from app.database import Base
 from app.dependencies import get_db
 from app.main import app
+from app.rate_limit import limiter
 
 test_engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)
@@ -38,6 +39,7 @@ async def override_get_db():
 
 
 app.dependency_overrides[get_db] = override_get_db
+limiter.enabled = False
 
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session", autouse=True)

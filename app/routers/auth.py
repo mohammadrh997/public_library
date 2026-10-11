@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.dependencies import CurrentMember, DBsession
 from app.models import Member
+from app.rate_limit import limiter
 from app.schemas import MemberCreate, MemberRead
 from app.security import create_access_token, hash_password, verify_password
 
@@ -29,7 +30,10 @@ async def create_member(payload: MemberCreate, db: DBsession):
 
 
 @router.post("/token")
-async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBsession):
+@limiter.limit("5/minute")
+async def login(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: DBsession, request: Request
+):
     member = (await db.scalars(select(Member).where(Member.email == form_data.username))).first()
     if member is None or not await run_in_threadpool(
         verify_password, form_data.password, member.hashed_password
