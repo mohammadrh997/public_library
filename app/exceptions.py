@@ -1,7 +1,10 @@
 import logging
 
+import requests
 from fastapi import Request
 from fastapi.responses import JSONResponse
+
+r = requests.get("https://www.python.org")
 
 logger = logging.getLogger(__name__)
 
