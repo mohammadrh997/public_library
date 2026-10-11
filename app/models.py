@@ -27,6 +27,7 @@ class Book(Base):
     isbn: Mapped[str] = mapped_column(unique=True)
     total_copies: Mapped[int]
     loans: Mapped[list["Loan"]] = relationship(back_populates="book")
+    publisher: Mapped[str | None]
 
 
 class Loan(Base):
