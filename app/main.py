@@ -27,7 +27,7 @@ logging.basicConfig(
 )
 
 
-app = FastAPI(title="Library", lifespan=lifespan)
+app = FastAPI(title="Public Library Lending API", lifespan=lifespan)
 app.state.limiter = limiter
 
 
