@@ -1,18 +1,26 @@
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 
 from alembic import context
 from app import models  # noqa: F401  registers every model on Base.metadata
 from app.config import settings
 from app.database import Base
 
-data_base = settings.database_url.replace("asyncpg", "psycopg2")
+
+def to_sync_url(async_url: str) -> str:
+    url = make_url(async_url).set(drivername="postgresql+psycopg2")
+    query = dict(url.query)
+    if "ssl" in query:
+        query["sslmode"] = query.pop("ssl")
+    return url.set(query=query).render_as_string(hide_password=False)
+
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-if data_base:
-    config.set_main_option("sqlalchemy.url", data_base)
+config.set_main_option("sqlalchemy.url", to_sync_url(settings.database_url).replace("%", "%%"))
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
