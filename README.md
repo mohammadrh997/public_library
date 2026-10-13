@@ -4,6 +4,12 @@
 
 A REST API for a public library's lending system. Librarians manage the catalogue; members borrow and return books. Built with FastAPI, async SQLAlchemy, and PostgreSQL, with JWT authentication and role-based access.
 
+## Live demo
+
+The API is deployed at **https://public-library-pwmb.onrender.com**, with interactive documentation at [/docs](https://public-library-pwmb.onrender.com/docs).
+
+It runs on Render's free tier, with a free Neon PostgreSQL database, both in Frankfurt. After 15 minutes without traffic the service stops, and the next request starts it again. Measured: the first request after an idle period took about 44 seconds; the next took about 0.3 seconds. If the first request seems to hang, give it a minute.
+
 ## Features
 
 - Member registration and login with JWT access tokens
@@ -34,6 +40,8 @@ A REST API for a public library's lending system. Librarians manage the catalogu
 | Caching | Redis via `redis.asyncio` |
 | Rate limiting | slowapi |
 | Containers | Docker, Docker Compose |
+| CI | GitHub Actions: lint, format check, type check, migration checks, tests |
+| Deployment | Render (Docker), Neon PostgreSQL, continuous deployment from `main` gated by CI |
 
 ## Project structure
 
@@ -54,6 +62,7 @@ app/
         books.py       catalogue management and borrowing
         loans.py       a member's loans, returns, overdue report
         health.py      health check for the hosting platform
+.github/workflows/     CI pipeline
 alembic/               database migrations
 tests/                 unit and API tests
 Dockerfile             container image definition
@@ -299,10 +308,16 @@ curl -X POST http://127.0.0.1:8000/books/1/borrow \
 
 **Login is rate limited per client address.** Five attempts per minute, counted in Redis so every process shares one limit, with an in-memory fallback so a Redis outage never blocks login.
 
+**Login does not reveal which emails are registered.** A wrong password and an unknown email return the same `401` with the same body, and they take the same time: when the email is unknown, the password is still checked against a dummy Argon2 hash, so the response is not measurably faster.
+
+**Nothing untested reaches production.** `main` is protected: every change arrives through a pull request, which can only merge once CI passes. Render deploys automatically from `main`, and the container runs any pending migrations before the server starts.
+
 **Logging borrows does not slow borrowing.** Each successful borrow is logged as a background task, which runs after the response has been sent. It goes to standard output rather than a file, so it survives in the platform's logs when a container is replaced.
 
 ## Known limitations and next steps
 
 - **Concurrent borrowing of the last copy.** Borrowing checks the number of free copies and then creates the loan. Two requests arriving at the same moment could both pass the check. Locking the relevant rows with `SELECT ... FOR UPDATE` inside the transaction would close this.
 - **Date handling uses more than one clock.** Due dates are calculated in UTC, the overdue check uses the server's local date, and `borrowed_at` uses the database's date. These can disagree near midnight on a server not set to UTC.
+- **Registration reveals whether an email exists.** Registering an existing email returns `409`. Closing this would need a registration flow that always responds the same way and confirms by email.
+- **Free-tier cold starts.** The live demo sleeps after 15 minutes of inactivity, so the first request afterwards is slow, as described under Live demo.
 - **The login limit is per address, not per account.** Clients behind one address share a limit, and a client that can vary its address can get around it. Counting failed attempts per account as well would close this.
