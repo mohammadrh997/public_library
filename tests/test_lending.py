@@ -61,14 +61,11 @@ async def test_loan_due_today_is_not_reported_overdue(
 ):
     member = await client.get("/auth/me", headers=member_headers)
     member_id = member.json()["id"]
-    due_date = datetime.now(UTC)
+    due_date = datetime.now(UTC).date()
     await insert_loan_directly(book["id"], member_id, due_date)
-    response = await client.get("/loans/overdue", headers=librarian_headers)
-    loans = response.json()
-    assert all(loan["book_id"] != book["id"] for loan in loans)
+    overdue_id = await insert_loan_directly(book["id"], member_id, due_date - timedelta(days=1))
 
-    due_date = datetime.now(UTC) - timedelta(days=1)
-    await insert_loan_directly(book["id"], member_id, due_date)
     response = await client.get("/loans/overdue", headers=librarian_headers)
-    loans = response.json()
-    assert all(loan["book_id"] == book["id"] for loan in loans)
+
+    assert response.status_code == 200
+    assert [loan["id"] for loan in response.json()] == [overdue_id]

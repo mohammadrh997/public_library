@@ -126,15 +126,16 @@ def insert_book_directly():
 
 @pytest.fixture
 def insert_loan_directly():
-    async def borrow(book_id, member_id, due_date):
+    async def insert(book_id, member_id, due_date):
         borrow_date = due_date - timedelta(days=14)
         async with test_engine.begin() as conn:
-            await conn.execute(
+            result = await conn.execute(
                 text(
                     "INSERT INTO loans(book_id, member_id, borrowed_at, due_date) VALUES "
-                    "(:i, :m, :b, :d)"
+                    "(:i, :m, :b, :d) RETURNING id"
                 ),
                 {"i": book_id, "m": member_id, "b": borrow_date, "d": due_date},
             )
+            return result.scalar_one()
 
-    return borrow
+    return insert
