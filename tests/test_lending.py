@@ -56,7 +56,7 @@ async def test_overdue_report_is_librarian_only(client, member_headers):
     assert response.status_code == 403
 
 
-async def test_loan_due_today_is_not_reported_overdue(
+async def test_overdue_report_includes_yesterday_but_not_today(
     client, member_headers, librarian_headers, book, insert_loan_directly
 ):
     member = await client.get("/auth/me", headers=member_headers)
