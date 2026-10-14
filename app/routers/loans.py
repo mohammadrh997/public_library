@@ -1,10 +1,8 @@
-import logging
 from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentMember, DBsession, pagination_params, require_librarian
@@ -13,7 +11,6 @@ from app.schemas import LoanRead, LoanReadBook, LoanReadBookMember
 
 router = APIRouter(prefix="/loans", tags=["loans"])
 PaginationDep = Annotated[dict, Depends(pagination_params)]
-logger = logging.getLogger(__name__)
 
 
 @router.get("/me", response_model=list[LoanReadBook])
@@ -26,20 +23,15 @@ async def get_loans(member: CurrentMember, db: DBsession):
 
 @router.post("/{loan_id}/return", response_model=LoanRead)
 async def return_book(loan_id: int, member: CurrentMember, db: DBsession):
-    loan = await db.get(Loan, loan_id, options=[selectinload(Loan.member)])
+    loan = await db.get(Loan, loan_id)
     if not loan:
         raise HTTPException(status_code=404, detail="Not Found")
-    if loan.member != member:
+    if loan.member_id != member.id:
         raise HTTPException(status_code=403, detail="Unauthorized changes")
     if loan.returned_at:
         raise HTTPException(status_code=409, detail="This book has already been returned")
-    loan.returned_at = datetime.now(UTC)
-    try:
-        await db.commit()
-    except IntegrityError as e:
-        await db.rollback()
-        logger.error(e)
-        raise
+    loan.returned_at = datetime.now(UTC).date()
+    await db.commit()
     await db.refresh(loan)
     return loan
 
