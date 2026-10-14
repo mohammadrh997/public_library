@@ -317,7 +317,6 @@ curl -X POST http://127.0.0.1:8000/books/1/borrow \
 ## Known limitations and next steps
 
 - **Concurrent borrowing of the last copy.** Borrowing checks the number of free copies and then creates the loan. Two requests arriving at the same moment could both pass the check. Locking the relevant rows with `SELECT ... FOR UPDATE` inside the transaction would close this.
-- **Date handling uses more than one clock.** Due dates are calculated in UTC, the overdue check uses the server's local date, and `borrowed_at` uses the database's date. These can disagree near midnight on a server not set to UTC.
 - **Registration reveals whether an email exists.** Registering an existing email returns `409`. Closing this would need a registration flow that always responds the same way and confirms by email.
 - **Free-tier cold starts.** The live demo sleeps after 15 minutes of inactivity, so the first request afterwards is slow, as described under Live demo.
 - **The login limit is per address, not per account.** Clients behind one address share a limit, and a client that can vary its address can get around it. Counting failed attempts per account as well would close this.

@@ -17,6 +17,8 @@ if "test" not in (make_url(TEST_DATABASE_URL).database or ""):
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ.setdefault("SECRET_KEY", "test-only-secret-key-at-least-32-bytes-long")
 
+from datetime import timedelta
+
 import httpx2
 import pytest
 import pytest_asyncio
@@ -118,5 +120,22 @@ def insert_book_directly():
                 ),
                 {"t": title, "i": isbn},
             )
+
+    return insert
+
+
+@pytest.fixture
+def insert_loan_directly():
+    async def insert(book_id, member_id, due_date):
+        borrow_date = due_date - timedelta(days=14)
+        async with test_engine.begin() as conn:
+            result = await conn.execute(
+                text(
+                    "INSERT INTO loans(book_id, member_id, borrowed_at, due_date) VALUES "
+                    "(:i, :m, :b, :d) RETURNING id"
+                ),
+                {"i": book_id, "m": member_id, "b": borrow_date, "d": due_date},
+            )
+            return result.scalar_one()
 
     return insert

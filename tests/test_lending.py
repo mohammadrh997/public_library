@@ -1,3 +1,6 @@
+from datetime import UTC, datetime, timedelta
+
+
 async def test_member_can_borrow_a_book(client, member_headers, book):
     response = await client.post(f"/books/{book['id']}/borrow", headers=member_headers)
     assert response.status_code == 201
@@ -51,3 +54,18 @@ async def test_my_loans_include_book_details(client, member_headers, book):
 async def test_overdue_report_is_librarian_only(client, member_headers):
     response = await client.get("/loans/overdue", headers=member_headers)
     assert response.status_code == 403
+
+
+async def test_overdue_report_includes_yesterday_but_not_today(
+    client, member_headers, librarian_headers, book, insert_loan_directly
+):
+    member = await client.get("/auth/me", headers=member_headers)
+    member_id = member.json()["id"]
+    due_date = datetime.now(UTC).date()
+    await insert_loan_directly(book["id"], member_id, due_date)
+    overdue_id = await insert_loan_directly(book["id"], member_id, due_date - timedelta(days=1))
+
+    response = await client.get("/loans/overdue", headers=librarian_headers)
+
+    assert response.status_code == 200
+    assert [loan["id"] for loan in response.json()] == [overdue_id]
